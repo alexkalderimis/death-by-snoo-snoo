@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+
+from intermine.webservice import Service
+
+import threading
+import random
+import logging
+import sys
+import os
+from time import time
+from Queue import Queue
+
+parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parentdir)
+
+from snoosnoo import weapons
+
+# Init logging
+def init_logging(lvl):
+    logger = logging.getLogger('snoosnoo')
+    logger.setLevel(lvl)
+    h = logging.FileHandler('snoosnoo.log')
+    h.setLevel(lvl)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    h.setFormatter(formatter)
+    logger.addHandler(h)
+
+
+class Counter(object):
+
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.start = time()
+        self.count = 0
+
+    def report(self):
+        with self.lock:
+            delta_t = time() - self.start
+            rate = self.count / delta_t
+
+            print self.count, "requests in", delta_t, "seconds, rate =", rate, "/s"
+
+    def add(self, n):
+        with self.lock:
+            self.count += n
+
+            if self.count % 100 == 0:
+                self.report()
+
+class Supervisor(object):
+
+    def __init__(self, n, service):
+        self.n = n
+        self.service = service
+        self.workers = []
+
+    def start_work(self):
+        counter = Counter()
+
+        for i in range(self.n):
+            for Weapon in [weapons.Queries, weapons.Lists, weapons.Search]:
+                worker = Weapon(self.service, counter)
+                t = threading.Thread(target = worker.besiege)
+                self.workers.append(t)
+                t.daemon = True
+                t.start()
+
+        for w in self.workers:
+            w.join()
+
+if __name__ == '__main__':
+    init_logging(logging.INFO)
+
+    if len(sys.argv) < 2:
+        print "URL required! usage: snoosnoo URL"
+        sys.exit()
+
+    url = sys.argv[1]
+
+    service = Service(url) # "http://beta.flymine.org/beta") # "http://met1:8080/beta")
+    s = Supervisor(10, service)
+
+    try:
+        s.start_work()
+    except KeyboardInterrupt:
+        sys.exit()
