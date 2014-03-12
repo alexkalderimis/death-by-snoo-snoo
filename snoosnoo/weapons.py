@@ -11,9 +11,10 @@ log = logging.getLogger('snoosnoo.weapons')
 
 class Weapon(object):
 
-    def __init__(self, service, counter):
+    def __init__(self, service, counter, i):
         self.service = service
         self.counter = counter
+        self.ident = i
 
     def besiege(self):
         while True:
@@ -22,16 +23,67 @@ class Weapon(object):
             except Exception as e:
                 log.error(e)
 
+class Users(Weapon):
+
+    LOG = logging.getLogger('snoosnoo.weapons.Users')
+
+    def attack(self):
+        username = "user-weapon-{0}@noreply.intermine.org".format(self.ident)
+        password = "yolo"
+
+        try:
+            s = Service(self.service.root, username, password)
+            s.deregister(s.get_deregistration_token())
+            self.counter.add(3)
+        except:
+            pass
+
+        s = self.service.register(username, password)
+        self.LOG.debug("Registered user " + username)
+        self.counter.add(1)
+
+        c = 0
+        classes = s.model.classes.values()
+        self.counter.add(1)
+
+        classkeys = s._get_json('/classkeys')['classes']
+        self.counter.add(1)
+
+        while c == 0:
+            table = random.choice(classes)
+            if not (table.has_id and table.name in classkeys):
+                continue
+            query = s.query(table.name).select(classkeys[table.name][0])
+
+            c = query.count()
+            self.counter.add(1)
+
+        n = random.randint(1, min(100, c))
+        members = random.sample(map(lambda r: r[0], query.rows()), n)
+        self.counter.add(1)
+
+        self.LOG.debug("Will construct list of %s with: %r", table.name, members)
+
+        with s.list_manager() as lm:
+            l = lm.create_list(members, table.name)
+            self.LOG.debug('Created list %s, size: %d', l.name, l.size)
+            self.counter.add(1)
+
+        try:
+            s.deregister(s.get_deregistration_token())
+            self.counter.add(2)
+        except:
+            pass
+
+
 class Search(Weapon):
 
     LOG = logging.getLogger('snoosnoo.weapons.Search')
 
     def attack(self):
-        self.do_search(random.choice(string.letters))
-        self.counter.add(1)
-
-        self.do_search(random.choice(string.letters) + random.choice(string.letters))
-        self.counter.add(1)
+        for k in xrange(3, 10):
+            self.do_search(''.join(random.sample(string.letters, k)))
+            self.counter.add(1)
 
     def do_search(self, term):
         service = self.service

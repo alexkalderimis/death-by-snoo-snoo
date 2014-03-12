@@ -3,6 +3,7 @@
 from intermine.webservice import Service
 
 import threading
+import argparse
 import random
 import logging
 import sys
@@ -49,17 +50,18 @@ class Counter(object):
 
 class Supervisor(object):
 
-    def __init__(self, n, service):
+    def __init__(self, weaponary, n, service):
         self.n = n
         self.service = service
         self.workers = []
+        self.weaponary = weaponary
 
     def start_work(self):
         counter = Counter()
 
         for i in range(self.n):
-            for Weapon in [weapons.Queries, weapons.Lists, weapons.Search]:
-                worker = Weapon(self.service, counter)
+            for Weapon in self.weaponary:
+                worker = Weapon(self.service, counter, i)
                 t = threading.Thread(target = worker.besiege)
                 self.workers.append(t)
                 t.daemon = True
@@ -71,14 +73,29 @@ class Supervisor(object):
 if __name__ == '__main__':
     init_logging(logging.INFO)
 
-    if len(sys.argv) < 2:
-        print "URL required! usage: snoosnoo URL"
-        sys.exit()
+    parser = argparse.ArgumentParser(description = 'Hug a mine to death')
+    parser.add_argument('url', type = str, help = 'the url of the mine to attack')
+    parser.add_argument('--queries', dest='queries', help='use queries', action='store_const', const=weapons.Queries)
+    parser.add_argument('--lists', dest='lists', help='use lists', action='store_const', const=weapons.Lists)
+    parser.add_argument('--search', dest='search', help='use search', action='store_const', const=weapons.Search)
+    parser.add_argument('--users', dest='users', help='use user accounts', action='store_const', const=weapons.Users)
+    parser.add_argument('--all', dest='all', help='use all weapons', action='store_const', const=True, default=False)
+    parser.add_argument('--workers', dest='workers', help='number of workers to arm with each weapon', type=int, default=20)
 
-    url = sys.argv[1]
+    args = parser.parse_args()
 
-    service = Service(url) # "http://beta.flymine.org/beta") # "http://met1:8080/beta")
-    s = Supervisor(10, service)
+    ws = []
+    if args.all:
+        ws = [weapons.Queries, weapons.Lists, weapons.Search, weapons.Users]
+    else:
+        ws = filter(None, [args.queries, args.lists, args.search, args.users])
+
+    if not ws:
+        parser.print_help()
+        sys.exit(1)
+
+    service = Service(args.url) # "http://beta.flymine.org/beta") # "http://met1:8080/beta")
+    s = Supervisor(ws, 10, service)
 
     try:
         s.start_work()

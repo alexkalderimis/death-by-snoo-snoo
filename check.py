@@ -18,10 +18,14 @@ class Counter:
     def add(self, n):
         pass
 
-w = weapons.Lists(flymine, Counter())
+w = weapons.Lists(flymine, Counter(), 0)
 
 w.attack()
 
-w = weapons.Search(flymine, Counter())
+w = weapons.Search(flymine, Counter(), 0)
+
+w.attack()
+
+w = weapons.Users(Service("http://localhost/intermine-test"), Counter(), 0)
 
 w.attack()
